@@ -60,6 +60,10 @@ def risk_bucket(rr: float) -> str:
 def pct(x: float) -> str:
     return f"{100*x:.1f}%"
 
+def get_htn_points(selected_label: str) -> int:
+    """Map the selected HTN level label to its points safely."""
+    mapping = {name: pts for (name, pts, _hint) in HTN_LEVELS}
+    return mapping.get(selected_label, 0)
 
 # -----------------------------
 # Sidebar: global settings
@@ -132,9 +136,10 @@ with st.form("risk_form", clear_on_submit=False):
 # -----------------------------
 # Calculation
 # -----------------------------
-def compute_points():
-    # HTN points
-    htn_points = {lvl[0]: lvl[1]}.get(htn_level, 0)
+def compute_points(selected_htn_label: str, flags: dict, include_care: bool):
+    # HTN points (fixed bug: build mapping from HTN_LEVELS)
+    htn_points = get_htn_points(selected_htn_label)
+
     # Other domain points (additive)
     other_points = 0
     breakdown = []
@@ -144,14 +149,14 @@ def compute_points():
 
     # Add other domains
     for name, pts, _ in DOMAINS:
-        if domain_flags.get(name, False):
+        if flags.get(name, False):
             other_points += pts
             breakdown.append((name, pts))
 
     # Care-process
-    if include_care_process:
+    if include_care:
         for name, pts, _ in CARE_PROCESS:
-            if domain_flags.get(name, False):
+            if flags.get(name, False):
                 other_points += pts
                 breakdown.append((name, pts))
 
@@ -159,7 +164,7 @@ def compute_points():
     return total, breakdown
 
 if submitted:
-    total_points, breakdown = compute_points()
+    total_points, breakdown = compute_points(htn_level, domain_flags, include_care_process)
     rr = rr_from_points(total_points)
     abs_risk = absolute_risk(rr, baseline_risk)
     bucket = risk_bucket(rr)
@@ -214,4 +219,3 @@ with st.expander("Model provenance"):
         "diminishing marginal increases beyond 5–6 points."
     )
 st.caption("© Your Team — For clinical decision support; not a substitute for clinical judgment.")
-
